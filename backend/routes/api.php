@@ -19,3 +19,8 @@ Route::get('/rooms/{id}', [RoomController::class, 'show']);
 Route::post('/players', [PlayerController::class, 'store']);
 Route::get('/messages', [MessageController::class, 'index']);
 Route::post('/messages', [MessageController::class, 'store']);
+
+// AI-powered endpoints
+Route::post('/messages/generate-narrative', [MessageController::class, 'generateNarrative']);
+Route::post('/messages/describe-image', [MessageController::class, 'describeImage']);
+Route::post('/messages/generate-image', [MessageController::class, 'generateImage']);
