@@ -30,7 +30,7 @@ export const DragonFrame = ({ children, className }: { children: React.ReactNode
       <div className="absolute inset-[8%] rounded-lg border border-[#E5B96F]/20 pointer-events-none" />
       
       {/* 4. LAYER: Content Container */}
-      <div className="relative z-10 w-full h-full flex gap-5 px-[14%] py-[12%]">
+      <div className="relative z-10 w-full h-full flex gap-5 px-[14%] py-[12%] pointer-events-auto">
         {children}
       </div>
     </div>

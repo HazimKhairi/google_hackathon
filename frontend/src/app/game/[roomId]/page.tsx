@@ -52,92 +52,124 @@ export default function GameRoomPage() {
   // Get current player's image
   const myImage = playerImages.find((img) => img.playerId === playerId);
 
+  // --- MOCK GAME LOOP ---
   useEffect(() => {
+    /* 
     const socket = getSocket();
+    // ... (Original socket logic commented out)
+    */
 
-    // Game start - role reveal
-    socket.on('game_start', (payload) => {
-      setGameMaster(payload.gameMasterId);
-      setPhase('role_reveal');
-      setShowRoleReveal(true);
-      
-      // Hide role reveal after 3 seconds
-      setTimeout(() => {
-        setShowRoleReveal(false);
-        setPhase('gm_receiving');
-      }, 3000);
-    });
+    // Simulate Game Start (Role Reveal)
+    if (phase === 'waiting') {
+        setTimeout(() => {
+            // Assign roles
+            const isMeGM = sessionStorage.getItem('isHost') === 'true';
+            setGameMaster(isMeGM ? (playerId || '') : 'host-123'); // If host, I am GM. Else host is GM.
+            
+            // Mock other players names if not set
+            // ensure players exist
+            if (players.length === 0) {
+                 // re-inject if lost (though store should persist)
+            }
 
-    // GM receives prompt and image
-    socket.on('gm_prompt', (payload) => {
-      setGMPrompt(payload.prompt, payload.imageUrl);
-      setPhase('describing');
-    });
+            setPhase('role_reveal');
+            setShowRoleReveal(true);
 
-    // GM sends description
-    socket.on('gm_description', (payload) => {
-      setGMDescription(payload.description);
-      setPhase('guessing');
-    });
+            setTimeout(() => {
+                setShowRoleReveal(false);
+                setPhase('gm_receiving');
+            }, 3000);
+        }, 1000);
+    }
 
-    // Player image generated
-    socket.on('image_generated', (payload) => {
-      const newImage: GeneratedImage = {
-        playerId: payload.playerId,
-        playerName: payload.playerName,
-        imageUrl: payload.imageUrl,
-      };
-      addPlayerImage(newImage);
-      
-      // Check if all players have submitted
-      // Transition to comparing phase would be handled by server
-    });
+    // Simulate GM Receiving Prompt (Only if I am GM, otherwise wait)
+    if (phase === 'gm_receiving') {
+        setTimeout(() => {
+            const mockPrompt = "A futuristic city in the clouds";
+            const mockImage = "/mock_image.png"; // We don't have this, but UI should handle missing img or we can use a placeholder
+            
+            setGMPrompt(mockPrompt, "https://via.placeholder.com/400"); // Use placeholder
+            setPhase('describing');
+        }, 2000);
+    }
 
-    // Comparison results
-    socket.on('comparison_result', (payload) => {
-      setPhase('comparing');
-      const rankingsData = payload.rankings.map((r) => ({
-        playerId: r.playerId,
-        similarity: r.similarity,
-      }));
-      setRankings(rankingsData);
-      
-      // Move to results after showing comparison
-      setTimeout(() => {
-        setPhase('results');
-      }, 3000);
-    });
-
-    // Game end
-    socket.on('game_end', (payload) => {
-      setWinner(payload.winnerId);
-      setPhase('results');
-    });
-
+    /*
+    // The rest of the phases are driven by user interaction, so we don't need auto-advance for them 
+    // unless we want to simulate OTHER players submitting.
+    */
+   
+    // Cleanup
     return () => {
-      socket.off('game_start');
-      socket.off('gm_prompt');
-      socket.off('gm_description');
-      socket.off('image_generated');
-      socket.off('comparison_result');
-      socket.off('game_end');
+      // socket.off...
     };
-  }, [setPhase, setGameMaster, setGMPrompt, setGMDescription, addPlayerImage, setRankings, setWinner]);
+  }, [phase, playerId, players, setGameMaster, setPhase, setGMPrompt]); // Added dependencies
 
   const handleSendDescription = (description: string) => {
-    sendDescription(description);
+    // MOCK: GM Sends description
+    // sendDescription(description);
     setGMDescription(description);
+    
+    // Auto advance to guessing after brief delay
+    setTimeout(() => {
+        setPhase('guessing');
+    }, 500);
   };
 
   const handleSubmitGuess = (guess: string) => {
     if (playerId) {
-      submitGuess(playerId, guess);
+      // submitGuess(playerId, guess);
+      // For mock purposes, if I am guesser, I submit and then we wait for "others"
+      // Then we go to generating
       setPhase('generating');
+
+      // Mock image generation after a delay
+      setTimeout(() => {
+           const myMockImage: GeneratedImage = {
+               playerId: playerId,
+               playerName: playerName || 'Me',
+               imageUrl: "https://via.placeholder.com/400/0000FF/808080?Text=MyGeneratedImage"
+           };
+           addPlayerImage(myMockImage);
+           
+           // Mock other players generating too
+           players.filter(p => p.id !== playerId).forEach(p => {
+               addPlayerImage({
+                   playerId: p.id,
+                   playerName: p.name,
+                   imageUrl: "https://via.placeholder.com/400/FF0000/FFFFFF?Text=BotImage"
+               });
+           });
+
+           // All generated -> Compare
+           setTimeout(() => {
+               // Mock Comparison
+               setPhase('comparing');
+               
+               // Mock Ranking
+               const mockRanking = players.map(p => ({
+                   playerId: p.id,
+                   similarity: Math.floor(Math.random() * 100)
+               })).sort((a,b) => b.similarity - a.similarity);
+               
+               setRankings(mockRanking);
+
+               // Go to results
+               setTimeout(() => {
+                   setWinner(mockRanking[0].playerId);
+                   setPhase('results');
+               }, 3000);
+
+           }, 2000);
+
+      }, 3000);
     }
   };
 
   const handlePlayAgain = () => {
     resetGame();
+    // router.push(`/lobby?room=${roomId}`);
+    // Stay in game or go to lobby? Original goes to lobby.
+    // In mock, we can just reset and maybe reload page or reset store
     router.push(`/lobby?room=${roomId}`);
   };
 

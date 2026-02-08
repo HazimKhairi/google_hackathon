@@ -28,93 +28,53 @@ export default function LobbyPage() {
 
   const { players, setRoom, addPlayer, setPlayers, removePlayer, playerId } = useGameStore();
 
-  // --- ECHO LOGIC ---
+  // --- ECHO LOGIC (DISABLED FOR MOCK MODE) ---
   useEffect(() => {
     if (!roomId) {
       router.push('/');
       return;
     }
 
-    const initConnection = async () => {
-      // 1. Ensure we have a player ID and Name (simulate Auth)
-      // In a real app, you'd likely have a login page before this.
-      // For now, we'll auto-login as a guest if no token exists.
-      let token = localStorage.getItem('auth_token');
-      
-      if (!token) {
-        try {
-          const storedName = sessionStorage.getItem('playerName') || generatePlayerName();
-          // Register as guest to get token
-          const { token: newToken, user } = await import('@/lib/api').then(m => m.api.loginAsGuest(storedName));
-          localStorage.setItem('auth_token', newToken);
-          sessionStorage.setItem('playerId', String(user.id));
-          sessionStorage.setItem('playerName', user.name);
-          token = newToken;
-        } catch (err) {
-          console.error('Guest login failed:', err);
-          setError('Authentication failed. Please try again.');
-          return;
+    // MOCK DATA INJECTION
+    const mockPlayers = [
+        { id: 'host-123', name: 'Host Player', isGameMaster: false, isConnected: true, score: 0 },
+        { id: 'p2', name: 'Cool Guest', isGameMaster: false, isConnected: true, score: 0 },
+        { id: 'p3', name: 'AI Fan', isGameMaster: false, isConnected: true, score: 0 },
+        // { id: 'p4', name: 'Designer', isGameMaster: false, isConnected: true, score: 0 }
+    ];
+
+    // Simulate "connecting" delay
+    setTimeout(() => {
+        setIsConnecting(false);
+        // Add self if not in mock list (or just overwrite for simplicity)
+        const myName = sessionStorage.getItem('playerName') || 'Me';
+        const myId = sessionStorage.getItem('playerId') || 'me-123';
+        
+        // Ensure we are in the list
+        // const allPlayers = [...mockPlayers, { id: myId, name: myName, isGameMaster: false, isConnected: true, score: 0 }];
+        
+        // Logic to merge or just set
+        // For mock mode, let's just set some dummy players and include "me"
+        mockPlayers.forEach(p => addPlayer(p));
+        
+        // Add current user if not already added
+        if (!mockPlayers.find(p => p.id === myId)) {
+             addPlayer({ id: myId, name: myName, isGameMaster: false, isConnected: true, score: 0 });
         }
-      }
 
-      // 2. Initialize Echo
-      const { getEcho } = await import('@/lib/echo');
-      const echo = getEcho();
+    }, 1000);
 
-      if (!echo) {
-        setError('Failed to initialize connection.');
-        return;
-      }
-
-      // 3. Join Presence Channel
-      // Note: Reverb channels are usually "game.room.{id}"
-      const channel = echo.join(`game.room.${roomId}`);
-
-      channel
-        .here((users: any[]) => {
-          setIsConnecting(false);
-          // Transform users to Players
-          const currentPlayers: Player[] = users.map(u => ({
-            id: String(u.id),
-            name: u.name,
-            isGameMaster: false, // You might want to assign GM based on logic
-            isConnected: true,
-            score: 0
-          }));
-          
-          // Sync with store - BE CAREFUL not to overwrite local state if already exists
-          // For simplicity, we just set the players from the server
-          // In a real app, you might want to merge with existing state
-          setPlayers(currentPlayers);
-        })
-        .joining((user: any) => {
-          addPlayer({
-            id: String(user.id),
-            name: user.name,
-            isGameMaster: false,
-            isConnected: true,
-            score: 0
-          });
-        })
-        .leaving((user: any) => {
-          removePlayer(String(user.id));
-        })
-        .error((err: any) => {
-          console.error('Channel error:', err);
-          setError('Connection error. Please refresh.');
-        });
-
-      // 4. Listen for other game events
-      channel.listen('.game.start', () => {
-        router.push(`/game/${roomId}`);
-      });
-      
-      return () => {
-        echo.leave(`game.room.${roomId}`);
-      };
+    /* 
+    const initConnection = async () => {
+      // ... (Original backend logic commented out)
     };
-
     initConnection();
+    */
+    
+    // Cleanup
+    return () => {
+       // echo.leave...
+    };
   }, [roomId, router, addPlayer, removePlayer]);
 
   const handleCopyCode = async () => {
@@ -125,8 +85,10 @@ export default function LobbyPage() {
   };
 
   const handleStartGame = () => {
-    const socket = getSocket();
-    socket.emit('start_game');
+    // MOCK: Direct navigation
+    // const socket = getSocket();
+    // socket.emit('start_game');
+    router.push(`/game/${roomId}`);
   };
 
   // Check isHost on client-side only to avoid hydration mismatch

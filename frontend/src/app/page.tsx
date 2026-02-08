@@ -48,7 +48,7 @@ export default function HomePage() {
   return (
     <main className="relative min-h-screen w-full bg-[#051C22] flex flex-col items-center justify-center overflow-hidden font-serif">
       
-      {/* --- CSS STYLES MOVED TO GLOBALS.CSS --- */}
+
 
       {/* --- LAYER 1: BACKGROUND GLOW --- */}
       {/* Warm light hitting the bottom of the frame */}
