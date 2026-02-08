@@ -48,30 +48,7 @@ export default function HomePage() {
   return (
     <main className="relative min-h-screen w-full bg-[#051C22] flex flex-col items-center justify-center overflow-hidden font-serif">
       
-      {/* --- CSS STYLES FOR SHIMMER EFFECT --- */}
-      <style jsx global>{`
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-        .text-metallic {
-          background: linear-gradient(
-            90deg, 
-            #8A6A2F 0%, 
-            #E5B96F 20%, 
-            #FFF5E1 50%, 
-            #E5B96F 80%, 
-            #8A6A2F 100%
-          );
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          color: transparent;
-          animation: shimmer 4s infinite linear;
-        }
-        .input-glow:focus {
-          box-shadow: 0 0 20px rgba(229, 185, 111, 0.3);
-        }
-      `}</style>
+      {/* --- CSS STYLES MOVED TO GLOBALS.CSS --- */}
 
       {/* --- LAYER 1: BACKGROUND GLOW --- */}
       {/* Warm light hitting the bottom of the frame */}

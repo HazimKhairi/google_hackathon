@@ -94,9 +94,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ players }),
 
   addPlayer: (player) => 
-    set((state) => ({ 
-      players: [...state.players, player] 
-    })),
+    set((state) => {
+      const exists = state.players.some((p) => p.id === player.id);
+      if (exists) {
+        return {
+           players: state.players.map((p) => p.id === player.id ? player : p)
+        };
+      }
+      return { 
+        players: [...state.players, player] 
+      };
+    }),
 
   removePlayer: (playerId) => 
     set((state) => ({ 

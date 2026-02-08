@@ -104,3 +104,22 @@ export function initializeMockData(
   // Set winner
   setWinner('player-2');
 }
+
+export const MOCK_USER = {
+  id: 'user-123',
+  name: 'Demo User',
+  token: 'mock-token-123'
+};
+
+export const MOCK_ROOM = {
+  id: 'DEMO01',
+  code: 'DEMO01',
+  host_id: 'player-1',
+  status: 'waiting',
+  players: MOCK_PLAYERS
+};
+
+export const MOCK_MESSAGES = [
+  { id: 'msg-1', room_id: 'DEMO01', sender_id: 'player-1', content: 'Welcome to the game!', created_at: new Date().toISOString() },
+  { id: 'msg-2', room_id: 'DEMO01', sender_id: 'player-2', content: 'Ready to play!', created_at: new Date().toISOString() }
+];

@@ -1,86 +1,118 @@
-'use client';
-
-import { io, Socket } from 'socket.io-client';
+// Stubbed Socket functions for Design Mode
+import { Socket } from 'socket.io-client';
 import type { ServerToClientEvents, ClientToServerEvents } from '@/types';
 
-// Placeholder WebSocket server URL - replace with actual backend URL
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
 
-// Type-safe socket instance
-type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+// Store event listeners
+type SocketCallback = (...args: unknown[]) => void;
+const listeners: Record<string, SocketCallback[]> = {};
 
-let socket: TypedSocket | null = null;
-
-/**
- * Get or create the WebSocket connection
- */
-export function getSocket(): TypedSocket {
-  if (!socket) {
-    socket = io(SOCKET_URL, {
-      autoConnect: false,
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    }) as TypedSocket;
+// Mock Socket object (partial)
+const mockSocket = {
+  connected: true,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  emit: (event: string, ...args: any[]) => {
+    console.log(`[MockSocket] Emitted: ${event}`, args);
+    // Simulate server response for some events
+    if (event === 'start_game') {
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('mock:game-start'));
+        }
+        simulateGameFlow();
+    }
+  },
+  on: (event: string, callback: SocketCallback) => {
+    console.log(`[MockSocket] Registered listener for: ${event}`);
+    if (!listeners[event]) listeners[event] = [];
+    listeners[event].push(callback);
+  },
+  off: (event: string) => {
+    console.log(`[MockSocket] Removed listener for: ${event}`);
+    if (listeners[event]) {
+        // Simple clear for mock
+        listeners[event] = [];
+    }
+  },
+  connect: () => {
+    console.log('[MockSocket] Connected');
+  },
+  disconnect: () => {
+    console.log('[MockSocket] Disconnected');
   }
-  return socket;
+} as unknown as Socket<ServerToClientEvents, ClientToServerEvents>;
+
+// Helper to trigger events
+function triggerEvent(event: string, payload: any) {
+    console.log(`[MockSocket] Triggering event: ${event}`, payload);
+    if (listeners[event]) {
+        listeners[event].forEach(cb => cb(payload));
+    }
 }
 
-/**
- * Connect to the WebSocket server
- */
-export function connectSocket(): void {
-  const s = getSocket();
-  if (!s.connected) {
-    s.connect();
-  }
+// Simulation logic
+function simulateGameFlow() {
+    console.log('[MockSocket] Starting game simulation...');
+    
+    // 1. Game Start
+    setTimeout(() => {
+        triggerEvent('game_start', { gameMasterId: 'player-1' });
+    }, 500);
+
+    // 2. GM Prompt (simulated after 3s)
+    setTimeout(() => {
+        triggerEvent('gm_prompt', { 
+            prompt: 'A futuristic city', 
+            imageUrl: 'https://picsum.photos/seed/gm/512/512' 
+        });
+    }, 4000); // Wait for role reveal (3s) + 1s
+
+    // 3. GM Description (simulated after another 3s)
+    // In real game, GM sends this manually. We can simulate it if needed, 
+    // or wait for the user (if acting as GM) to call sendDescription.
 }
 
-/**
- * Disconnect from the WebSocket server
- */
-export function disconnectSocket(): void {
-  if (socket?.connected) {
-    socket.disconnect();
-  }
+export function getSocket() {
+  return mockSocket;
 }
 
-/**
- * Check if socket is connected
- */
-export function isConnected(): boolean {
-  return socket?.connected ?? false;
+export function connectSocket() {
+  console.log('[MockSocket] connectSocket called');
 }
 
-/**
- * Join a game room
- */
-export function joinRoom(roomId: string, playerId: string, playerName: string): void {
-  const s = getSocket();
-  s.emit('join_room', { roomId, playerId, playerName });
+export function disconnectSocket() {
+  console.log('[MockSocket] disconnectSocket called');
 }
 
-/**
- * Send GM description to other players
- */
-export function sendDescription(description: string): void {
-  const s = getSocket();
-  s.emit('send_description', { description });
+export function isConnected() {
+  return true;
 }
 
-/**
- * Submit a guess for the prompt
- */
-export function submitGuess(playerId: string, guessPrompt: string): void {
-  const s = getSocket();
-  s.emit('submit_guess', { playerId, guessPrompt });
+export function joinRoom(roomId: string, playerId: string, playerName: string) {
+  console.log(`[MockSocket] Joining room ${roomId} as ${playerName} (${playerId})`);
+  // Simulate joining success immediately if needed
 }
 
-/**
- * Start the game (only room host can do this)
- */
-export function startGame(): void {
-  const s = getSocket();
-  s.emit('start_game');
+export function sendDescription(description: string) {
+  console.log(`[MockSocket] Sending description: ${description}`);
+  // Simulate server broadcasting description
+  setTimeout(() => {
+      triggerEvent('gm_description', { description });
+  }, 500);
+}
+
+export function submitGuess(playerId: string, guessPrompt: string) {
+  console.log(`[MockSocket] Player ${playerId} guessed: ${guessPrompt}`);
+  // Simulate image generation completion after a delay
+  setTimeout(() => {
+      triggerEvent('image_generated', {
+          playerId,
+          playerName: 'Player ' + playerId, // simplified
+          imageUrl: `https://picsum.photos/seed/${playerId}/512/512`
+      });
+  }, 2000);
+}
+
+export function startGame() {
+  console.log('[MockSocket] Game started');
+  simulateGameFlow();
 }

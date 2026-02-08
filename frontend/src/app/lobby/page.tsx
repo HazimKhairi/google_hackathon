@@ -26,7 +26,7 @@ export default function LobbyPage() {
   const [isReady, setIsReady] = useState(false);
   const [isHost, setIsHost] = useState(false);
 
-  const { players, setRoom, addPlayer, removePlayer, playerId } = useGameStore();
+  const { players, setRoom, addPlayer, setPlayers, removePlayer, playerId } = useGameStore();
 
   // --- ECHO LOGIC ---
   useEffect(() => {
@@ -85,7 +85,7 @@ export default function LobbyPage() {
           // Sync with store - BE CAREFUL not to overwrite local state if already exists
           // For simplicity, we just set the players from the server
           // In a real app, you might want to merge with existing state
-          currentPlayers.forEach((p) => addPlayer(p));
+          setPlayers(currentPlayers);
         })
         .joining((user: any) => {
           addPlayer({
