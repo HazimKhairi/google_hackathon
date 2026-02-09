@@ -5,34 +5,37 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { User, UserPlus } from 'lucide-react';
 
+import Image from 'next/image';
+
 /**
  * DragonFrame: The main container with dragon border SVG.
  * Uses the new dragon_border2.svg which has built-in transparency.
  */
 export const DragonFrame = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <div className={cn("relative w-full max-w-7xl flex items-center justify-center", className)}>
-    
+
     {/* 1. LAYER: Dark background that shows through the transparent SVG center */}
-    <div className="absolute inset-[6%] bg-gradient-to-br from-[#0A2830] via-[#072028] to-[#051820] rounded-lg shadow-[inset_0_0_40px_rgba(0,0,0,0.6)]" />
-    
-    {/* 2. LAYER: The Dragon Border SVG (transparent center) */}
-    <div 
-      className="relative w-full pointer-events-none"
-      style={{ 
-        backgroundImage: 'url("/dragon_border2.svg")',
-        backgroundSize: '100% 100%',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        aspectRatio: '16/9',
-      }}
+    <div className="absolute inset-[15%] bg-gradient-to-br from-[#0A2830] via-[#072028] to-[#051820] rounded-lg shadow-[inset_0_0_40px_rgba(0,0,0,0.6)]" />
+
+    {/* 2. LAYER: The Dragon Border SVG (Overlay with pointer-events-none) */}
+    <div className="absolute inset-0 pointer-events-none z-50">
+      <Image
+        src="/dragon_border2.svg"
+        alt="Dragon Border"
+        fill
+        className="object-fill"
+        priority
+      />
+    </div>
+
+    {/* 3. LAYER: Content Container */}
+    <div
+      className="relative z-10 w-full flex gap-5 px-[18%] py-[14%] aspect-video"
     >
-      {/* 3. LAYER: Subtle golden inner border glow */}
-      <div className="absolute inset-[8%] rounded-lg border border-[#E5B96F]/20 pointer-events-none" />
-      
-      {/* 4. LAYER: Content Container */}
-      <div className="relative z-10 w-full h-full flex gap-5 px-[14%] py-[12%] pointer-events-auto">
-        {children}
-      </div>
+      {/* Inner Border Glow (Optional, keeping consistent with previous design) */}
+      <div className="absolute inset-0 rounded-lg border border-[#E5B96F]/10 pointer-events-none" />
+
+      {children}
     </div>
   </div>
 );
@@ -53,7 +56,7 @@ export const PlayerBadge = ({ name, status, isCurrentUser }: PlayerBadgeProps) =
   const currentStatus = statusConfig[status];
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -66,18 +69,18 @@ export const PlayerBadge = ({ name, status, isCurrentUser }: PlayerBadgeProps) =
           isCurrentUser ? "bg-[#E5B96F]/40" : "bg-[#E5B96F]/20",
           "group-hover:bg-[#E5B96F]/50"
         )} />
-        
+
         {/* Avatar Circle */}
         <div className={cn(
           "w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-[#0A2A35] to-[#051C22] border-2 flex items-center justify-center shadow-xl z-10 relative group-hover:scale-110 transition-all duration-300",
           isCurrentUser ? "border-[#E5B96F] ring-2 ring-[#E5B96F]/30" : "border-[#E5B96F]/60"
         )}>
-           <User className={cn(
-             "w-5 h-5 md:w-6 md:h-6 transition-colors",
-             isCurrentUser ? "text-[#E5B96F]" : "text-[#E5B96F]/70"
-           )} />
+          <User className={cn(
+            "w-5 h-5 md:w-6 md:h-6 transition-colors",
+            isCurrentUser ? "text-[#E5B96F]" : "text-[#E5B96F]/70"
+          )} />
         </div>
-        
+
         {/* Status indicator dot */}
         <div className={cn(
           "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0A2A35] z-20",
@@ -88,8 +91,8 @@ export const PlayerBadge = ({ name, status, isCurrentUser }: PlayerBadgeProps) =
 
       <div className="text-center space-y-0.5">
         <p className={cn(
-            "font-serif text-[9px] md:text-[10px] uppercase tracking-wider font-bold max-w-[70px] truncate transition-colors", 
-            isCurrentUser ? "text-[#E5B96F]" : "text-[#E5B96F]/70 group-hover:text-[#E5B96F]"
+          "font-serif text-[9px] md:text-[10px] uppercase tracking-wider font-bold max-w-[70px] truncate transition-colors",
+          isCurrentUser ? "text-[#E5B96F]" : "text-[#E5B96F]/70 group-hover:text-[#E5B96F]"
         )}>
           {name}
           {isCurrentUser && <span className="text-[7px] opacity-50 ml-1">(You)</span>}
@@ -109,7 +112,7 @@ export const PlayerBadge = ({ name, status, isCurrentUser }: PlayerBadgeProps) =
 
 /** Empty player slot with animated dashed border */
 export const EmptyPlayerSlot = ({ index }: { index: number }) => (
-  <motion.div 
+  <motion.div
     initial={{ opacity: 0, scale: 0.8 }}
     animate={{ opacity: 1, scale: 1 }}
     transition={{ delay: index * 0.1, type: 'spring', stiffness: 200 }}
@@ -118,11 +121,11 @@ export const EmptyPlayerSlot = ({ index }: { index: number }) => (
     <div className="relative">
       {/* Pulsing glow on hover */}
       <div className="absolute inset-0 rounded-full bg-[#E5B96F]/10 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
-      
+
       {/* Dashed circle with animated border */}
       <div className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-dashed border-[#E5B96F]/30 flex items-center justify-center bg-[#051C22]/30 group-hover:border-[#E5B96F]/50 group-hover:bg-[#051C22]/50 transition-all duration-300 relative">
         <UserPlus className="w-4 h-4 text-[#E5B96F]/30 group-hover:text-[#E5B96F]/60 transition-colors" />
-        
+
         {/* Spinning dashed outer ring */}
         <div className="absolute inset-[-3px] rounded-full border border-[#E5B96F]/20 border-dashed animate-[spin_15s_linear_infinite]" />
       </div>
