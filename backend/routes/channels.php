@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Broadcast;
-use App\Models\User;
+use Illuminate\Support\Facades\Request;
 
 /*
 |--------------------------------------------------------------------------
@@ -9,19 +9,11 @@ use App\Models\User;
 |--------------------------------------------------------------------------
 */
 
-// This defines the "game.room.{id}" channel.
-// It creates a "Presence Channel" that tracks who is online.
-Broadcast::channel('game.room.{roomId}', function (User $user, $roomId) {
-    
-    // 1. In a real app, you might check "if ($user->room_id == $roomId)" here.
-    // For the hackathon, we allow anyone with the ID to join.
+// Public channels don't require authentication
+// The "game.room.{id}" channel is now a public channel
+// Player join/leave events are broadcast via PlayerJoined and PlayerLeft events
 
-    // 2. Return the data you want to show in the "Lobby" on the Frontend.
-    return [
-        'id' => $user->id,
-        'name' => $user->name,
-        'email' => $user->email,
-        // If you added a 'role' column to your users table, uncomment this:
-        // 'role' => $user->role, 
-    ];
-});
+// If you want to add authorization logic in the future, uncomment below:
+// Broadcast::channel('game.room.{roomId}', function ($user, $roomId) {
+//     return ['id' => $user->id, 'name' => $user->name];
+// });

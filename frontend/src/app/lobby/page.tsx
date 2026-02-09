@@ -7,7 +7,8 @@ import { Copy, QrCode, CheckCircle2, Crown, Users } from 'lucide-react';
 
 // Imports from your existing codebase
 import { useGameStore } from '@/stores/useGameStore';
-import { getSocket, connectSocket, joinRoom } from '@/lib/socket';
+import { joinRoom, onEvent, toggleReady, disconnectSocket } from '@/lib/socket';
+import { reconnectEcho } from '@/lib/echo';
 import { generatePlayerName, cn } from '@/lib/utils';
 import type { Player } from '@/types';
 
@@ -28,67 +29,99 @@ export default function LobbyPage() {
 
   const { players, setRoom, addPlayer, setPlayers, removePlayer, playerId } = useGameStore();
 
-  // --- ECHO LOGIC (DISABLED FOR MOCK MODE) ---
+  // --- REAL WEBSOCKET CONNECTION ---
   useEffect(() => {
     if (!roomId) {
       router.push('/');
       return;
     }
 
-    // MOCK DATA INJECTION
-    const mockPlayers = [
-      { id: 'host-123', name: 'Host Player', isGameMaster: true, isConnected: true, score: 0 },
-      { id: 'p2', name: 'Cool Guest', isGameMaster: false, isConnected: true, score: 0 },
-      { id: 'p3', name: 'AI Fan', isGameMaster: false, isConnected: true, score: 0 },
-      // { id: 'p4', name: 'Designer', isGameMaster: false, isConnected: true, score: 0 }
-    ];
-
-    // ... (in rendering part)
-
-    {
-      players.map((p) => (
-        <PlayerBadge
-          key={p.id}
-          name={p.name}
-          isCurrentUser={p.id === playerId}
-          status={p.isGameMaster ? 'ready' : (p.id === playerId ? (isReady ? 'ready' : 'not-ready') : 'not-ready')}
-        />
-      ))
-    }
-
-    // Simulate "connecting" delay
-    setTimeout(() => {
-      setIsConnecting(false);
-      // Add self if not in mock list (or just overwrite for simplicity)
-      const myName = sessionStorage.getItem('playerName') || 'Me';
-      const myId = sessionStorage.getItem('playerId') || 'me-123';
-
-      // Ensure we are in the list
-      // const allPlayers = [...mockPlayers, { id: myId, name: myName, isGameMaster: false, isConnected: true, score: 0 }];
-
-      // Logic to merge or just set
-      // For mock mode, let's just set some dummy players and include "me"
-      mockPlayers.forEach(p => addPlayer(p));
-
-      // Add current user if not already added
-      if (!mockPlayers.find(p => p.id === myId)) {
-        addPlayer({ id: myId, name: myName, isGameMaster: false, isConnected: true, score: 0 });
-      }
-
-    }, 1000);
-
-    /* 
     const initConnection = async () => {
-      // ... (Original backend logic commented out)
+      try {
+        setIsConnecting(true);
+
+        // Get player info from session storage
+        const storedPlayerId = sessionStorage.getItem('playerId');
+        const storedPlayerName = sessionStorage.getItem('playerName') || generatePlayerName();
+
+        // Generate player ID if not exists
+        const currentPlayerId = storedPlayerId || `player-${Date.now()}`;
+        const currentPlayerName = storedPlayerName;
+
+        // Store player info
+        sessionStorage.setItem('playerId', currentPlayerId);
+        sessionStorage.setItem('playerName', currentPlayerName);
+
+        // Update game store
+        setRoom(roomId, currentPlayerId, currentPlayerName);
+
+        // Force reconnect to WebSocket with new player info
+        reconnectEcho();
+
+        // Get host status
+        const isCurrentHost = sessionStorage.getItem('isHost') === 'true';
+
+        // Join the room (this will call backend API and subscribe to channel)
+        const joinResponse = await joinRoom(roomId, currentPlayerId, currentPlayerName, isCurrentHost);
+
+        // Set all players from backend response (includes existing + current player)
+        if (joinResponse?.players) {
+          console.log('[Lobby] Setting players from backend:', joinResponse.players);
+          setPlayers(joinResponse.players);
+        }
+
+        // Listen for OTHER players joining
+        onEvent('player_joined', (data: { player: Player; playerCount: number }) => {
+          console.log('[Lobby] Another player joined:', data);
+          // Only add if it's not the current player (avoid duplicates)
+          if (data.player.id !== currentPlayerId) {
+            addPlayer(data.player);
+          }
+        });
+
+        // Listen for player left event
+        onEvent('player_left', (data: { playerId: string; playerCount: number }) => {
+          console.log('[Lobby] Player left:', data);
+          removePlayer(data.playerId);
+        });
+
+        // Listen for player ready event
+        onEvent('player_ready', (data: { playerId: string; isReady: boolean }) => {
+          console.log('[Lobby] Player ready status changed:', data);
+          // Update the player's ready status in the store
+          const currentPlayers = useGameStore.getState().players;
+          const updated = currentPlayers.map(p =>
+            p.id === data.playerId ? { ...p, isReady: data.isReady } : p
+          );
+          setPlayers(updated);
+
+          // If this is our own ready status echoed back, sync local state
+          if (data.playerId === currentPlayerId) {
+            setIsReady(data.isReady);
+          }
+        });
+
+        // Listen for game start event
+        onEvent('game_start', (data: { gameMasterId: string }) => {
+          console.log('[Lobby] Game starting with GM:', data.gameMasterId);
+          router.push(`/game/${roomId}`);
+        });
+
+        setIsConnecting(false);
+      } catch (err) {
+        console.error('[Lobby] Connection error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to connect');
+        setIsConnecting(false);
+      }
     };
+
     initConnection();
-    */
 
     // Cleanup
     return () => {
-      // echo.leave...
+      disconnectSocket();
     };
-  }, [roomId, router, addPlayer, removePlayer]);
+  }, [roomId, router, setRoom, addPlayer, removePlayer, setPlayers]);
 
   const handleCopyCode = async () => {
     if (!roomId) return;
@@ -97,11 +130,24 @@ export default function LobbyPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleStartGame = () => {
-    // MOCK: Direct navigation
-    // const socket = getSocket();
-    // socket.emit('start_game');
-    router.push(`/game/${roomId}`);
+  const handleStartGame = async () => {
+    if (!roomId || !playerId) return;
+
+    try {
+      setIsConnecting(true);
+
+      // Call the startGame function from socket.ts which will call the backend
+      const { startGame } = await import('@/lib/socket');
+      await startGame(playerId);
+
+      // The navigation will happen when we receive the game.start event
+      // So we don't need to navigate here
+    } catch (err) {
+      console.error('[Lobby] Error starting game:', err);
+      setError('Failed to start game');
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   // Check isHost on client-side only to avoid hydration mismatch
@@ -210,7 +256,7 @@ export default function LobbyPage() {
                       key={p.id}
                       name={p.name}
                       isCurrentUser={p.id === playerId}
-                      status={p.id === playerId ? (isReady ? 'ready' : 'not-ready') : 'not-ready'}
+                      status={p.isReady ? 'ready' : 'not-ready'}
                     />
                   ))}
 
@@ -260,7 +306,7 @@ export default function LobbyPage() {
 
                   <p className="text-[#E5B96F]/40 text-[9px] uppercase tracking-wider">
                     {canStart
-                      ? `${players.length} players ready`
+                      ? `${players.filter(p => p.isReady).length}/${players.length} players ready`
                       : `Need ${2 - players.length} more player${2 - players.length > 1 ? 's' : ''}`
                     }
                   </p>
@@ -306,7 +352,18 @@ export default function LobbyPage() {
                 </div>
 
                 <div className="w-full space-y-2 relative z-10 mt-4">
-                  <GameButton onClick={() => setIsReady(!isReady)}>
+                  <GameButton onClick={async () => {
+                    const newReady = !isReady;
+                    setIsReady(newReady);
+                    if (playerId) {
+                      try {
+                        await toggleReady(playerId, newReady);
+                      } catch (err) {
+                        console.error('[Lobby] Failed to toggle ready:', err);
+                        setIsReady(!newReady); // revert on failure
+                      }
+                    }
+                  }}>
                     {isReady ? 'CANCEL READY' : 'READY UP'}
                   </GameButton>
                   <p className={cn(

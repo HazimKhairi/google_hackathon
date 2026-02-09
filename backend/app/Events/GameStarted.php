@@ -9,17 +9,17 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class SceneGenerated implements ShouldBroadcastNow
+class GameStarted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $roomId;
-    public $imageUrl;
+    public $gameMasterId;
 
-    public function __construct($roomId, $imageUrl)
+    public function __construct($roomId, $gameMasterId)
     {
         $this->roomId = $roomId;
-        $this->imageUrl = $imageUrl;
+        $this->gameMasterId = $gameMasterId;
     }
 
     public function broadcastOn(): array
@@ -31,6 +31,13 @@ class SceneGenerated implements ShouldBroadcastNow
 
     public function broadcastAs()
     {
-        return 'scene.updated';
+        return 'game.start';
+    }
+
+    public function broadcastWith()
+    {
+        return [
+            'gameMasterId' => $this->gameMasterId,
+        ];
     }
 }

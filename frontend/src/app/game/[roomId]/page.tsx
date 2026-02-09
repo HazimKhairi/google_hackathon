@@ -16,7 +16,37 @@ import { Button } from '@/components/ui';
 import { useGameStore } from '@/stores/useGameStore';
 import { getSocket, sendDescription, submitGuess } from '@/lib/socket';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 import type { GamePhase, GeneratedImage } from '@/types';
+
+// Prompt pool - a random one is picked each round
+const PROMPT_POOL = [
+  "A futuristic city floating in the clouds at sunset",
+  "A dragon guarding a treasure chest inside a volcano",
+  "An underwater kingdom with glowing jellyfish lanterns",
+  "A samurai standing in a field of cherry blossoms at night",
+  "A steampunk airship flying over a desert canyon",
+  "A haunted lighthouse on a stormy cliff",
+  "A robot gardener tending to a magical forest",
+  "A giant tree house village connected by rope bridges",
+  "A crystal cave with a hidden waterfall inside a mountain",
+  "A space station orbiting a planet with two suns",
+  "A pirate ship sailing through a sea of clouds",
+  "A wizard's library with floating books and glowing orbs",
+  "A neon-lit cyberpunk street market in the rain",
+  "A cozy cabin in a snowy forest with northern lights above",
+  "A medieval castle built on the back of a giant turtle",
+  "An ancient temple overgrown with vines in a dense jungle",
+  "A phoenix rising from flames above an erupting volcano",
+  "A magical portal opening in the middle of a quiet village",
+  "A knight riding a mechanical horse through a wasteland",
+  "A floating island with a waterfall pouring into the void",
+  "A cat cafe on the moon with Earth visible through the window",
+  "A train crossing a bridge over a canyon filled with mist",
+  "A Viking longship navigating through icebergs under aurora",
+  "A secret garden hidden behind a waterfall in a cliff",
+  "A giant octopus wrapping around an old shipwreck",
+];
 
 export default function GameRoomPage() {
   const router = useRouter();
@@ -57,39 +87,32 @@ export default function GameRoomPage() {
   // --- MOCK GAME LOOP ---
   useEffect(() => {
     // 1. INITIALIZE PLAYER & MOCK DATA ON MOUNT
+    // Always reset to exactly 4 players (1 user + 3 bots)
+    // Clear any stale isGameMaster from lobby
     if (!playerId || players.length === 0) {
         const storedPlayerId = sessionStorage.getItem('playerId') || 'me-123';
         const storedPlayerName = sessionStorage.getItem('playerName') || 'Me';
-        const isHost = sessionStorage.getItem('isHost') === 'true';
 
-        // Re-inject mock players + self
-        const mockPlayers = [
-            { id: 'host-123', name: 'Host Player', isGameMaster: false, isConnected: true, score: 0 },
-            { id: 'p2', name: 'Cool Guest', isGameMaster: false, isConnected: true, score: 0 },
-            { id: 'p3', name: 'AI Fan', isGameMaster: false, isConnected: true, score: 0 },
+        const botNames = ['Dragon Slayer', 'Cool Guest', 'AI Fan'];
+        const botIds = ['bot-1', 'bot-2', 'bot-3'];
+
+        const allPlayers = [
+            { id: storedPlayerId, name: storedPlayerName, isGameMaster: false, isConnected: true, score: 0 },
+            ...botNames.map((name, i) => ({
+                id: botIds[i],
+                name,
+                isGameMaster: false,
+                isConnected: true,
+                score: 0,
+            })),
         ];
-        
-        let allPlayers = [...mockPlayers];
-        
-        // If I am not in the mock list (e.g. I am the host or a new guest), add/merge me
-        // For simplicity in mock:
-        // If I am host, replace 'host-123' or just identify as it. 
-        // Let's just append me if I'm not "Host Player" equivalent
-        if (storedPlayerId !== 'host-123') { // Simple check
-             allPlayers.push({ id: storedPlayerId, name: storedPlayerName, isGameMaster: false, isConnected: true, score: 0 });
-        } else {
-             // If I am claiming to be host-123, ensure name matches or update it
-             allPlayers = allPlayers.map(p => p.id === 'host-123' ? { ...p, name: storedPlayerName } : p);
-        }
 
-        // Update Store
-        // setRoom(roomId, storedPlayerId, storedPlayerName); // setRoom might reset players? check store. 
-        // Actually setRoom just sets id/name.
-        useGameStore.setState({ 
-            roomId, 
-            playerId: storedPlayerId, 
+        useGameStore.setState({
+            roomId,
+            playerId: storedPlayerId,
             playerName: storedPlayerName,
-            players: allPlayers 
+            players: allPlayers,
+            gameMasterId: null, // Reset - will be picked randomly in step 2
         });
     }
 
@@ -97,15 +120,12 @@ export default function GameRoomPage() {
     if (phase === 'waiting') {
         const timer = setTimeout(() => {
             const currentPlayers = useGameStore.getState().players;
-            const myId = useGameStore.getState().playerId;
-            const isHost = sessionStorage.getItem('isHost') === 'true';
-            
-            // Determine GM
-            // If I am host, I am GM. 
-            // If I am guest, 'host-123' is GM.
-            const initialGMId = isHost ? (myId || 'host-123') : 'host-123';
-            
-            setGameMaster(initialGMId);
+
+            // Randomly pick GM from all players
+            const randomIndex = Math.floor(Math.random() * currentPlayers.length);
+            const randomGMId = currentPlayers[randomIndex]?.id || currentPlayers[0]?.id;
+
+            setGameMaster(randomGMId);
             setPhase('role_reveal');
             setShowRoleReveal(true);
 
@@ -117,16 +137,106 @@ export default function GameRoomPage() {
         return () => clearTimeout(timer);
     }
 
-    // 3. GM RECEIVING PROMPT
+    // 3. GM RECEIVING PROMPT - pick random prompt from pool
     if (phase === 'gm_receiving') {
-        const timer = setTimeout(() => {
-            const mockPrompt = "A futuristic city in the clouds";
-            setGMPrompt(mockPrompt, "https://via.placeholder.com/400");
+        const timer = setTimeout(async () => {
+            const randomPrompt = PROMPT_POOL[Math.floor(Math.random() * PROMPT_POOL.length)];
+            try {
+                const imageUrl = await api.generateImage(randomPrompt);
+                setGMPrompt(randomPrompt, imageUrl);
+            } catch (err) {
+                console.error('[Game] Failed to generate GM image:', err);
+                // Backend handles fallback - will return placeholder if all APIs fail
+                setGMPrompt(randomPrompt, '');
+            }
             setPhase('describing');
         }, 2000);
         return () => clearTimeout(timer);
     }
-  }, [phase, roomId, setGameMaster, setPhase, setGMPrompt]); // Removed players/playerId deps to prevent infinite re-loops if not handled carefully
+
+    // 4. If user is NOT the GM, bot GM auto-sends description after a realistic delay
+    if (phase === 'describing') {
+        const state = useGameStore.getState();
+        const iAmGM = state.playerId === state.gameMasterId;
+        if (!iAmGM) {
+            // Longer delay (8s) to simulate GM thinking and typing
+            const timer = setTimeout(() => {
+                const currentPrompt = useGameStore.getState().gmPrompt || '';
+                const prefixes = [
+                    "I see", "The image shows", "In this scene,", "Before me lies", "The picture reveals"
+                ];
+                const suffixes = [
+                    "The atmosphere is incredible.",
+                    "It's quite a stunning sight.",
+                    "The details are vivid and rich.",
+                    "The colors and mood are striking.",
+                    "Everything feels alive and detailed."
+                ];
+                const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+                const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+                const promptLower = currentPrompt.charAt(0).toLowerCase() + currentPrompt.slice(1);
+                const botDescription = `${prefix} ${promptLower.replace(/^a /i, '').replace(/^an /i, '')}. ${suffix}`;
+                setGMDescription(botDescription);
+                setPhase('guessing');
+            }, 8000);
+            return () => clearTimeout(timer);
+        }
+    }
+
+    // 5. If user IS the GM, after description sent, bot players auto-guess
+    if (phase === 'guessing') {
+        const state = useGameStore.getState();
+        const iAmGM = state.playerId === state.gameMasterId;
+        if (iAmGM) {
+            const timer = setTimeout(() => {
+                setPhase('generating');
+
+                setTimeout(async () => {
+                    const currentPlayers = useGameStore.getState().players;
+                    const gmId = useGameStore.getState().gameMasterId;
+                    const currentPrompt = useGameStore.getState().gmPrompt;
+                    const available = PROMPT_POOL.filter(pr => pr !== currentPrompt);
+
+                    // All non-GM players auto-generate images
+                    const nonGMPlayers = currentPlayers.filter(p => p.id !== gmId);
+                    for (let i = 0; i < nonGMPlayers.length; i++) {
+                        const p = nonGMPlayers[i];
+                        const botGuess = available[(i + Math.floor(Math.random() * available.length)) % available.length];
+                        let imageUrl: string;
+                        try {
+                            imageUrl = await api.generateImage(botGuess);
+                        } catch {
+                            imageUrl = ''; // Backend handles fallback
+                        }
+                        addPlayerImage({ playerId: p.id, playerName: p.name, imageUrl });
+                    }
+
+                    // Move to comparing
+                    setTimeout(() => {
+                        setPhase('comparing');
+
+                        const allPlayers = useGameStore.getState().players;
+                        const gm = useGameStore.getState().gameMasterId;
+                        const mockRanking = allPlayers
+                            .filter(p => p.id !== gm)
+                            .map(p => ({
+                                playerId: p.id,
+                                similarity: Math.floor(Math.random() * 100)
+                            })).sort((a, b) => b.similarity - a.similarity);
+
+                        setRankings(mockRanking);
+
+                        setTimeout(() => {
+                            setWinner(mockRanking[0].playerId);
+                            setPhase('results');
+                        }, 3000);
+                    }, 4000);
+                }, 3000);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }
+  }, [phase, roomId, setGameMaster, setPhase, setGMPrompt, setGMDescription, addPlayerImage, setRankings, setWinner]);
 
   const handleSendDescription = (description: string) => {
     // MOCK: GM Sends description
@@ -141,40 +251,51 @@ export default function GameRoomPage() {
 
   const handleSubmitGuess = (guess: string) => {
     if (playerId) {
-      // submitGuess(playerId, guess);
-      // For mock purposes, if I am guesser, I submit and then we wait for "others"
-      // Then we go to generating
       setPhase('generating');
 
-      // Mock image generation after a delay
-      setTimeout(() => {
+      // Generate AI images via backend (Ollama -> Replicate -> Pollinations fallback)
+      setTimeout(async () => {
+           // Generate user's image
+           let myImageUrl: string;
+           try {
+               myImageUrl = await api.generateImage(guess);
+           } catch {
+               myImageUrl = ''; // Backend handles fallback
+           }
            const myMockImage: GeneratedImage = {
                playerId: playerId,
                playerName: playerName || 'Me',
-               imageUrl: "https://via.placeholder.com/400/0000FF/808080?Text=MyGeneratedImage"
+               imageUrl: myImageUrl
            };
            addPlayerImage(myMockImage);
-           
-           // Mock other players generating too
-           players.filter(p => p.id !== playerId).forEach(p => {
-               addPlayerImage({
-                   playerId: p.id,
-                   playerName: p.name,
-                   imageUrl: "https://via.placeholder.com/400/FF0000/FFFFFF?Text=BotImage"
-               });
-           });
+
+           // Generate AI images for other players too
+           const otherPlayers = players.filter(p => p.id !== playerId && p.id !== gameMasterId);
+           for (let i = 0; i < otherPlayers.length; i++) {
+               const p = otherPlayers[i];
+               const currentPrompt = useGameStore.getState().gmPrompt;
+               const available = PROMPT_POOL.filter(pr => pr !== currentPrompt);
+               const botGuess = available[(i + Math.floor(Math.random() * available.length)) % available.length];
+               let botImageUrl: string;
+               try {
+                   botImageUrl = await api.generateImage(botGuess);
+               } catch {
+                   botImageUrl = ''; // Backend handles fallback
+               }
+               addPlayerImage({ playerId: p.id, playerName: p.name, imageUrl: botImageUrl });
+           }
 
            // All generated -> Compare
            setTimeout(() => {
-               // Mock Comparison
                setPhase('comparing');
-               
-               // Mock Ranking
-               const mockRanking = players.map(p => ({
-                   playerId: p.id,
-                   similarity: Math.floor(Math.random() * 100)
-               })).sort((a,b) => b.similarity - a.similarity);
-               
+
+               const mockRanking = players
+                   .filter(p => p.id !== gameMasterId)
+                   .map(p => ({
+                       playerId: p.id,
+                       similarity: Math.floor(Math.random() * 100)
+                   })).sort((a,b) => b.similarity - a.similarity);
+
                setRankings(mockRanking);
 
                // Go to results
@@ -183,7 +304,7 @@ export default function GameRoomPage() {
                    setPhase('results');
                }, 3000);
 
-           }, 2000);
+           }, 4000);
 
       }, 3000);
     }
@@ -260,7 +381,14 @@ export default function GameRoomPage() {
         );
 
       case 'generating':
-        return (
+        return isGameMaster ? (
+          <GMPanel
+            prompt={gmPrompt}
+            imageUrl={gmImage}
+            isDescribing={false}
+            onSubmitDescription={handleSendDescription}
+          />
+        ) : (
           <GuesserPanel
             gmDescription={gmDescription}
             isGuessing={false}
@@ -345,10 +473,8 @@ export default function GameRoomPage() {
                     className="text-[#E5B96F]/40 text-[10px] uppercase hover:text-[#E5B96F] hover:bg-[#E5B96F]/10 h-6 px-2 border border-[#E5B96F]/10"
                     onClick={() => {
                         const currentId = useGameStore.getState().playerId || 'me-123';
-                        const newGM = isGameMaster ? 'host-123' : currentId;
-                        // Determine who 'host-123' is. If I am 'host-123', toggle to 'p2' or something else?
-                        // For simplicity: If I am GM, make 'p2' GM. If I am NOT GM, make ME GM.
-                        const targetGM = isGameMaster ? (players.find(p => p.id !== currentId)?.id || 'host-123') : currentId;
+                        // If I am GM, make a bot the GM. If I am NOT GM, make ME GM.
+                        const targetGM = isGameMaster ? (players.find(p => p.id !== currentId)?.id || 'bot-1') : currentId;
                         setGameMaster(targetGM);
                     }}
                  >
@@ -398,7 +524,7 @@ export default function GameRoomPage() {
 
                 {/* MAIN CONTENT */}
                 <motion.div
-                    key={phase}
+                    key={phase === 'generating' ? 'guessing' : phase}
                     className="w-full h-full"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}

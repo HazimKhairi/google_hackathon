@@ -15,6 +15,7 @@ export interface Player {
   name: string;
   isGameMaster: boolean;
   isConnected: boolean;
+  isReady?: boolean;
   avatar?: string;
   score?: number;
 }

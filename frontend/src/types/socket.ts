@@ -10,6 +10,9 @@ export interface PlayerJoinedPayload {
   player: {
     id: string;
     name: string;
+    isGameMaster: boolean;
+    isConnected: boolean;
+    score: number;
   };
   playerCount: number;
 }
@@ -61,9 +64,15 @@ export interface PlayerLeftPayload {
   playerCount: number;
 }
 
+export interface PlayerReadyPayload {
+  playerId: string;
+  isReady: boolean;
+}
+
 // Socket event names
 export type ServerToClientEvents = {
   player_joined: (payload: PlayerJoinedPayload) => void;
+  player_ready: (payload: PlayerReadyPayload) => void;
   game_start: (payload: GameStartPayload) => void;
   gm_prompt: (payload: GMPromptPayload) => void;
   gm_description: (payload: GMDescriptionPayload) => void;

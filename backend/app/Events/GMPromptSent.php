@@ -9,16 +9,18 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class SceneGenerated implements ShouldBroadcastNow
+class GMPromptSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $roomId;
+    public $prompt;
     public $imageUrl;
 
-    public function __construct($roomId, $imageUrl)
+    public function __construct($roomId, $prompt, $imageUrl)
     {
         $this->roomId = $roomId;
+        $this->prompt = $prompt;
         $this->imageUrl = $imageUrl;
     }
 
@@ -31,6 +33,14 @@ class SceneGenerated implements ShouldBroadcastNow
 
     public function broadcastAs()
     {
-        return 'scene.updated';
+        return 'gm.prompt';
+    }
+
+    public function broadcastWith()
+    {
+        return [
+            'prompt' => $this->prompt,
+            'imageUrl' => $this->imageUrl,
+        ];
     }
 }

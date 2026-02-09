@@ -1,16 +1,67 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from "next/image";
+import { useRouter } from 'next/navigation';
 import { GMPanel } from '@/components/game';
-import { MOCK_IMAGES } from '@/lib/mockData';
+import { useGameStore } from '@/stores/useGameStore';
+import { sendDescription, subscribeToRoom, disconnectSocket } from '@/lib/socket';
+import '@/lib/debug'; // Enable network debugging
 
 export default function GameMasterPage() {
+    const router = useRouter();
+    const { gmPrompt, gmImage, gmDescription, roomId } = useGameStore();
     const [isDescribing, setIsDescribing] = useState(true);
 
-    const handleSubmit = (desc: string) => {
-        console.log('Description submitted:', desc);
-        setIsDescribing(false);
+    useEffect(() => {
+        if (!roomId) {
+            router.push('/');
+            return;
+        }
+
+        // If GM hasn't created a prompt + image yet, redirect to setup
+        if (!gmPrompt || !gmImage) {
+            router.push('/gm-setup');
+            return;
+        }
+
+        console.log('[GM] Subscribing to room:', roomId);
+
+        // Subscribe to the room channel so we can send events
+        subscribeToRoom(roomId);
+
+        // If description already submitted, set state accordingly
+        if (gmDescription) {
+            setIsDescribing(false);
+        }
+
+        // Cleanup on unmount
+        return () => {
+            disconnectSocket();
+        };
+    }, [roomId, gmPrompt, gmImage, gmDescription, router]);
+
+    const handleSubmit = async (desc: string) => {
+        console.log('[GM] ========== SUBMIT DESCRIPTION START ==========');
+        console.log('[GM] Room ID:', roomId);
+        console.log('[GM] Description:', desc);
+        console.log('[GM] Description length:', desc.length);
+
+        try {
+            console.log('[GM] Calling sendDescription...');
+            const result = await sendDescription(desc);
+            console.log('[GM] sendDescription result:', result);
+
+            setIsDescribing(false);
+            console.log('[GM] Description submitted successfully!');
+            console.log('[GM] ========== SUBMIT DESCRIPTION END ==========');
+        } catch (error) {
+            console.error('[GM] ========== ERROR SUBMITTING DESCRIPTION ==========');
+            console.error('[GM] Error:', error);
+            console.error('[GM] Error message:', error instanceof Error ? error.message : 'Unknown error');
+            console.error('[GM] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+            console.error('[GM] ========== ERROR END ==========');
+        }
     };
 
     return (
@@ -38,8 +89,8 @@ export default function GameMasterPage() {
                 <div className="w-full max-w-4xl backdrop-blur-sm bg-black/20 p-8 rounded-2xl border border-[#E5B96F]/10">
                     <h2 className="text-2xl text-[#E5B96F] text-center mb-6 uppercase tracking-widest font-bold">Game Master View</h2>
                     <GMPanel
-                        prompt="A futuristic city floating in the clouds during sunset"
-                        imageUrl={MOCK_IMAGES.gmImage}
+                        prompt={gmPrompt || 'Loading prompt...'}
+                        imageUrl={gmImage || ''}
                         isDescribing={isDescribing}
                         onSubmitDescription={handleSubmit}
                     />

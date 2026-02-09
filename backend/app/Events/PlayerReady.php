@@ -4,22 +4,23 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class SceneGenerated implements ShouldBroadcastNow
+class PlayerReady implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $roomId;
-    public $imageUrl;
+    public $playerId;
+    public $isReady;
 
-    public function __construct($roomId, $imageUrl)
+    public function __construct($roomId, $playerId, $isReady)
     {
         $this->roomId = $roomId;
-        $this->imageUrl = $imageUrl;
+        $this->playerId = $playerId;
+        $this->isReady = $isReady;
     }
 
     public function broadcastOn(): array
@@ -31,6 +32,14 @@ class SceneGenerated implements ShouldBroadcastNow
 
     public function broadcastAs()
     {
-        return 'scene.updated';
+        return 'player.ready';
+    }
+
+    public function broadcastWith()
+    {
+        return [
+            'playerId' => $this->playerId,
+            'isReady' => $this->isReady,
+        ];
     }
 }

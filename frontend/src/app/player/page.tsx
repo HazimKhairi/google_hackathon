@@ -1,23 +1,76 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from "next/image";
+import { useRouter } from 'next/navigation';
 import { GuesserPanel } from '@/components/game';
-import { MOCK_IMAGES } from '@/lib/mockData';
+import { useGameStore } from '@/stores/useGameStore';
+import { submitGuess, onEvent, subscribeToRoom, disconnectSocket } from '@/lib/socket';
 
 export default function PlayerPage() {
+    const router = useRouter();
+    const { gmDescription, playerId, playerName, roomId, playerImages, setGMDescription } = useGameStore();
     const [phase, setPhase] = useState<'guessing' | 'generating' | 'done'>('guessing');
-    const [mockImage, setMockImage] = useState<string | null>(null);
+    const [playerImage, setPlayerImage] = useState<string | null>(null);
 
-    const handleGuess = (guess: string) => {
-        console.log('Guess submitted:', guess);
+    // Subscribe to room channel and listen for events
+    useEffect(() => {
+        if (!roomId || !playerId) {
+            router.push('/');
+            return;
+        }
+
+        console.log('[Player] Subscribing to room:', roomId);
+
+        // Subscribe to the room channel
+        subscribeToRoom(roomId);
+
+        // Listen for GM description event
+        onEvent('gm_description', (data: { description: string }) => {
+            console.log('[Player] Received GM description:', data);
+            setGMDescription(data.description);
+        });
+
+        // Listen for image generated event
+        onEvent('image_generated', (data: { playerId: string; playerName: string; imageUrl: string }) => {
+            console.log('[Player] Image generated:', data);
+
+            // Only update if it's this player's image
+            if (data.playerId === playerId) {
+                setPlayerImage(data.imageUrl);
+                setPhase('done');
+            }
+        });
+
+        // Cleanup on unmount
+        return () => {
+            disconnectSocket();
+        };
+
+    }, [roomId, playerId, router, setGMDescription]);
+
+    // Check if player already submitted a guess
+    useEffect(() => {
+        const myImage = playerImages.find(img => img.playerId === playerId);
+        if (myImage) {
+            setPlayerImage(myImage.imageUrl);
+            setPhase('done');
+        }
+    }, [playerImages, playerId]);
+
+    const handleGuess = async (guess: string) => {
+        if (!playerId || !playerName) return;
+
+        console.log('[Player] Submitting guess:', guess);
         setPhase('generating');
 
-        // Simulate generation delay
-        setTimeout(() => {
-            setMockImage(MOCK_IMAGES.player1Image);
-            setPhase('done');
-        }, 3000);
+        try {
+            await submitGuess(playerId, playerName, guess);
+            // The phase will change to 'done' when we receive the image_generated event
+        } catch (error) {
+            console.error('[Player] Error submitting guess:', error);
+            setPhase('guessing');
+        }
     };
 
     return (
@@ -45,10 +98,10 @@ export default function PlayerPage() {
                 <div className="w-full max-w-4xl backdrop-blur-sm bg-black/20 p-8 rounded-2xl border border-[#E5B96F]/10">
                     <h2 className="text-2xl text-[#E5B96F] text-center mb-6 uppercase tracking-widest font-bold">Player View</h2>
                     <GuesserPanel
-                        gmDescription="A beautiful sunset over a city in the clouds."
+                        gmDescription={gmDescription || 'Waiting for Game Master description...'}
                         isGuessing={phase === 'guessing'}
                         isGenerating={phase === 'generating'}
-                        playerImage={mockImage}
+                        playerImage={playerImage}
                         onSubmitGuess={handleGuess}
                     />
                 </div>

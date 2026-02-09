@@ -1,21 +1,32 @@
 'use client';
 
+import { useEffect } from 'react';
 import Image from "next/image";
+import { useRouter } from 'next/navigation';
 import { ResultsScreen } from '@/components/game';
-import { MOCK_RANKINGS } from '@/lib/mockData';
+import { useGameStore } from '@/stores/useGameStore';
 
 export default function ResultsPage() {
+    const router = useRouter();
+    const { winnerId, rankings, players, roomId } = useGameStore();
 
-    // Transform MOCK_RANKINGS to match ResultsScreen props if needed
-    // The ResultsScreen expects rankings with { playerId, playerName, similarity }
-    // MOCK_RANKINGS might miss playerName, so I'll mock it.
+    useEffect(() => {
+        if (!roomId) {
+            router.push('/');
+        }
+    }, [roomId, router]);
 
-    const rankings = MOCK_RANKINGS.map(r => ({
-        ...r,
-        playerName: r.playerId === 'player-1' ? 'Alex Chen' :
-            r.playerId === 'player-2' ? 'Sarah Kim' :
-                r.playerId === 'player-3' ? 'Mike Johnson' : 'Emma Wilson'
-    }));
+    // Transform rankings to include player names
+    const rankingsWithNames = rankings.map(r => {
+        const player = players.find(p => p.id === r.playerId);
+        return {
+            ...r,
+            playerName: player?.name || 'Unknown Player',
+        };
+    });
+
+    const winner = players.find(p => p.id === winnerId);
+    const winnerName = winner?.name || 'Unknown Winner';
 
     return (
         <main className="relative min-h-screen w-full bg-[#051C22] text-[#f8fafc] flex flex-col items-center justify-center overflow-hidden font-serif">
@@ -40,10 +51,13 @@ export default function ResultsPage() {
             {/* Main Content Container */}
             <div className="relative z-20 w-full max-w-7xl min-h-screen flex flex-col items-center justify-center p-8">
                 <ResultsScreen
-                    winnerId="player-2"
-                    winnerName="Sarah Kim"
-                    rankings={rankings}
-                    onPlayAgain={() => window.location.reload()}
+                    winnerId={winnerId || ''}
+                    winnerName={winnerName}
+                    rankings={rankingsWithNames}
+                    onPlayAgain={() => {
+                        // Reset game state and go back to lobby
+                        router.push(`/lobby?room=${roomId}`);
+                    }}
                 />
             </div>
         </main>
